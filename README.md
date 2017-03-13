@@ -14,7 +14,7 @@ Project to simulate a swiss style sports tournament.
 
 1. To initialize the database, at a command line prompt, type:
 
-```python
+```
 $ psql
 psqlPrompt => \i tournament.sql
 ```
