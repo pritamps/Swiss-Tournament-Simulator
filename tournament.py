@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# 
+#
 # tournament.py -- implementation of a Swiss-system tournament
 #
 
@@ -13,14 +13,27 @@ TOURNAMENT_YEAR = "2017"
 TOURNAMENT_SPORT = "TENNIS"
 
 
+def connect(database_name="tournaments"):
+    """
+    Connects to DB and returns DB and cursor
+    """
+    try:
+        db = psycopg2.connect("dbname={}".format(database_name))
+        cursor = db.cursor()
+        return db, cursor
+    except:
+        print("Could not connect to database. Aborting!")
+
+
 def createTournament(tournament_name=TOURNAMENT_NAME,
                      year=TOURNAMENT_YEAR, sport=TOURNAMENT_SPORT):
     """Creates a new tournament and returns its ID"""
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
+    DB, c = connect()
     # Safe insert into DB. USE QUERY PARAMETERS INSTEAD OF STRING SUBSTITUTION
-    c.execute("INSERT INTO tournaments (name, year, sport ) VALUES (%s, %s, %s) RETURNING id", 
-                    (bleach.clean(tournament_name), bleach.clean(year), bleach.clean(sport), ))
+    c.execute("INSERT INTO tournaments (name, year, sport ) VALUES (%s, %s, %s) \
+               RETURNING id", (bleach.clean(tournament_name),
+                               bleach.clean(year),
+                               bleach.clean(sport), ))
     tournament_id = c.fetchone()
     DB.commit()
     DB.close()
@@ -30,9 +43,9 @@ def createTournament(tournament_name=TOURNAMENT_NAME,
 def getTournamentID(tournament_name=TOURNAMENT_NAME,
                     year=TOURNAMENT_YEAR, sport=TOURNAMENT_SPORT):
 
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
-    c.execute("SELECT id from tournaments WHERE name='" + tournament_name + "' AND year='" + year + "'")
+    DB, c = connect()
+    c.execute("SELECT id from tournaments WHERE name=%s AND year=%s",
+              (tournament_name, TOURNAMENT_YEAR))
     rows = c.fetchone()
     if rows is None:
         return None
@@ -40,34 +53,25 @@ def getTournamentID(tournament_name=TOURNAMENT_NAME,
         return rows[0]
 
 
-def connect():
-    """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=" + DB_NAME)
-
-
 def deleteMatches():
     """Remove all the match records from the database."""
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
-    c.execute("DELETE from matches")
+    DB, c = connect()
+    c.execute("TRUNCATE matches")
     DB.commit()
     DB.close()
 
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
-    c.execute("DELETE from matches")
-    c.execute("DELETE from players")
+    DB, c = connect()
+    c.execute("TRUNCATE players CASCADE")
     DB.commit()
     DB.close()
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
+    DB, c = connect()
     c.execute("SELECT count(*) FROM players")
     count = c.fetchone()[0]
     DB.close()
@@ -85,11 +89,11 @@ def registerPlayer(name, tournament_name=TOURNAMENT_NAME,
     Args:
       name: the player's full name (need not be unique).
     """
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
+    DB, c = connect()
 
     # Get tournament ID for given tournament. If it doesn't exist, create it
-    c.execute("SELECT id from tournaments WHERE name='" + tournament_name + "' AND year='" + year + "'")
+    c.execute("SELECT id from tournaments WHERE name=%s AND year=%s",
+              (tournament_name, TOURNAMENT_YEAR))
     rows = c.fetchone()
     if rows is None:
         tournament_id = createTournament()[0]
@@ -97,7 +101,8 @@ def registerPlayer(name, tournament_name=TOURNAMENT_NAME,
         tournament_id = rows[0]
 
     # Add new player (if they don't exist already) and get their ID
-    c.execute("INSERT into players (name) VALUES (%s) RETURNING id", (bleach.clean(name),))
+    c.execute("INSERT into players (name) VALUES (%s) RETURNING id",
+              (bleach.clean(name),))
     player_id = c.fetchone()[0]
 
     DB.commit()
@@ -107,8 +112,8 @@ def registerPlayer(name, tournament_name=TOURNAMENT_NAME,
 def playerStandings():
     """Returns a list of the players and their win records, sorted by wins.
 
-    The first entry in the list should be the player in first place, or a player
-    tied for first place if there is currently a tie.
+    The first entry in the list should be the player in first place,
+    or a player tied for first place if there is currently a tie.
 
     Returns:
       A list of tuples, each of which contains (id, name, wins, matches):
@@ -118,8 +123,7 @@ def playerStandings():
         matches: the number of matches the player has played
     """
     list_of_tuples = []
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
+    DB, c = connect()
     c.execute("SELECT * FROM player_standings")
     rows = c.fetchall()
     tournament_id = getTournamentID(tournament_name=TOURNAMENT_NAME,
@@ -132,7 +136,9 @@ def playerStandings():
 
 
 def reportMatch(winner, loser,
-                tournament_name=TOURNAMENT_NAME, year=TOURNAMENT_YEAR, round=-1):
+                tournament_name=TOURNAMENT_NAME,
+                year=TOURNAMENT_YEAR,
+                round=-1):
     """Records the outcome of a single match between two players.
 
     Args:
@@ -143,7 +149,8 @@ def reportMatch(winner, loser,
     c = DB.cursor()
 
     # Get tournament ID for given tournament. If it doesn't exist, create it
-    c.execute("SELECT id from tournaments WHERE name='" + tournament_name + "' AND year='" + year + "'")
+    c.execute("SELECT id from tournaments WHERE name=%s AND year=%s",
+              (tournament_name, TOURNAMENT_YEAR))
     rows = c.fetchone()
 
     if rows is None:
@@ -151,7 +158,8 @@ def reportMatch(winner, loser,
     else:
         tournament_id = rows[0]
 
-    c.execute("INSERT INTO matches (winner, loser, tournament_id, round) VALUES (%s, %s, %s, %s)", (winner, loser, tournament_id, round) )
+    c.execute("INSERT INTO matches (winner, loser, tournament_id, round) VALUES \
+              (%s, %s, %s, %s)", (winner, loser, tournament_id, round))
 
     DB.commit()
     DB.close()
@@ -173,15 +181,12 @@ def swissPairings():
         name2: the second player's name
     """
 
-    DB = psycopg2.connect("dbname=" + DB_NAME)
-    c = DB.cursor()
+    DB, c = connect()
     standings = playerStandings()
 
     list_of_tuples = []
     for i in range(0, len(standings), 2):
-        list_of_tuples.append((standings[i][0], standings[i][1], standings[i+1][0], standings[i+1][1]))
+        list_of_tuples.append((standings[i][0], standings[i][1],
+                              standings[i+1][0], standings[i+1][1]))
 
     return list_of_tuples
-
-
-

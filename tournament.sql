@@ -19,8 +19,8 @@ CREATE TABLE tournaments ( id SERIAL PRIMARY KEY,
 
 -- Create matches database
 CREATE TABLE matches ( id SERIAL PRIMARY KEY,
-                      winner SERIAL references players(id),
-                      loser SERIAL references players(id),
+                      winner INTEGER references players(id),
+                      loser INTEGER references players(id),
                       tournament_id SERIAL references tournaments(id),
                       round SMALLINT );
 
