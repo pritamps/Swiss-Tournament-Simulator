@@ -177,8 +177,6 @@ def swissPairings():
     c = DB.cursor()
     standings = playerStandings()
 
-    # Start with round 1
-    round = 1
     list_of_tuples = []
     for i in range(0, len(standings), 2):
         list_of_tuples.append((standings[i][0], standings[i][1], standings[i+1][0], standings[i+1][1]))
